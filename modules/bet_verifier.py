@@ -39,13 +39,13 @@ class BETVerifier:
             return (VerifyResult.UNKNOWN, "截图失败")
         
         # 尝试读取BET数字
-        before_bet = self._read_bet(before_img)
-        after_bet = self._read_bet(after_img)
+        before_bet, before_mode = self._read_bet(before_img)
+        after_bet, after_mode = self._read_bet(after_img)
         
         # UNKNOWN: 无法识别
         if before_bet is None or after_bet is None:
             return (VerifyResult.UNKNOWN, 
-                    f"模板无法识别(前={before_bet}, 后={after_bet})")
+                    f"识别失败(前={before_bet}[{before_mode}], 后={after_bet}[{after_mode}])")
         
         # VERIFIED / NOT_VERIFIED: 数字可比较
         if expected_direction == 'increase':
@@ -71,13 +71,26 @@ class BETVerifier:
                         f"BET {before_bet}→{after_bet} 未变化")
     
     def _read_bet(self, img):
-        """读取BET数字（占位：当前模板匹配不可靠，返回None）"""
-        # TODO: 接入可靠的BET识别
-        # 当前状态：模板匹配返回None → 触发UNKNOWN
-        if self.vision and hasattr(self.vision, 'read_credit_bet'):
-            try:
-                _, bet = self.vision.read_credit_bet(img)
-                return bet
-            except:
-                pass
-        return None
+        """读取BET数字（区分失败模式，不吞异常）
+        
+        Returns:
+            (bet: int|None, failure_mode: str)
+            failure_mode: 'ok' | 'no_vision' | 'no_method' | 
+                          'exception' | 'none_result' | 'bad_format'
+        """
+        if self.vision is None:
+            return (None, 'no_vision')
+        if not hasattr(self.vision, 'read_credit_bet'):
+            return (None, 'no_method')
+        try:
+            result = self.vision.read_credit_bet(img)
+        except Exception as e:
+            return (None, f'exception:{type(e).__name__}:{e}')
+        if result is None:
+            return (None, 'none_result')
+        if not isinstance(result, (tuple, list)) or len(result) != 2:
+            return (None, f'bad_format:{type(result)}')
+        _, bet = result
+        if bet is None:
+            return (None, 'none_result')
+        return (bet, 'ok')
