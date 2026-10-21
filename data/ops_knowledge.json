@@ -1,0 +1,232 @@
+{
+  "key_map": {
+    "coin": {
+      "key": "5",
+      "evdev": "KEY_5",
+      "desc": "投币",
+      "verified": "2026-10-17 CREDIT 8→9",
+      "method": "uinput"
+    },
+    "start": {
+      "key": "1",
+      "evdev": "KEY_1",
+      "desc": "开始游戏",
+      "verified": "2026-10-17 进入对局",
+      "method": "uinput"
+    },
+    "tile_select": {
+      "keys": [
+        "a",
+        "b",
+        "c",
+        "d",
+        "e",
+        "f",
+        "g",
+        "h",
+        "i",
+        "j",
+        "k",
+        "l",
+        "m",
+        "n"
+      ],
+      "evdev_prefix": "KEY_",
+      "desc": "选第1-14张牌",
+      "verified": "2026-10-17 按A选中第1张",
+      "method": "uinput"
+    },
+    "confirm": {
+      "key": "enter",
+      "evdev": "KEY_ENTER",
+      "desc": "确认",
+      "verified": "2026-10-17 过信息屏",
+      "method": "uinput"
+    },
+    "menu": {
+      "key": "tab",
+      "evdev": "KEY_TAB",
+      "desc": "MAME菜单",
+      "verified": "2026-10-17 打开Tab菜单",
+      "method": "uinput"
+    },
+    "cancel": {
+      "key": "esc",
+      "evdev": "KEY_ESC",
+      "desc": "取消/关菜单",
+      "verified": "2026-10-17 关DIP菜单",
+      "method": "uinput"
+    }
+  },
+  "input_notes": {
+    "xdotool": "X11合成按键，MAME收不到（走底层输入）",
+    "uinput": "内核级虚拟键盘，MAME识别为真实硬件，必须用这个",
+    "uinput_setup": [
+      "sudo usermod -a -G input zhangdawei",
+      "sudo chmod 666 /dev/uinput",
+      "python3 -c 'from evdev import UInput'  # 验证"
+    ]
+  },
+  "dip_settings": {
+    "coinage": {
+      "value": "1 Coin/1 Credit",
+      "desc": "投币比"
+    },
+    "key_in_rate": {
+      "value": 10,
+      "desc": "Key-In比率"
+    },
+    "credit_limit": {
+      "value": 2000,
+      "desc": "Credit上限"
+    },
+    "credit_mode": {
+      "value": "Coin Acceptor",
+      "desc": "Credit模式"
+    },
+    "payout_mode": {
+      "value": "Return Coins",
+      "desc": "派彩模式"
+    },
+    "demo_sounds": {
+      "value": "On",
+      "desc": "演示音效"
+    },
+    "double_up_jackpot": {
+      "value": 500,
+      "desc": "比倍奖池"
+    },
+    "minimum_bet": {
+      "value": 1,
+      "desc": "最小押注"
+    },
+    "double_up_game": {
+      "value": "On",
+      "desc": "比倍游戏"
+    },
+    "controls": {
+      "value": "Mahjong",
+      "desc": "控制器类型"
+    },
+    "number_type": {
+      "value": "Numbers",
+      "desc": "数字类型"
+    },
+    "how_to_change": "Tab → DIP Switches → 上下选择 → 左右改值 → Esc退出"
+  },
+  "game_flow": {
+    "steps": [
+      {
+        "phase": "info",
+        "desc": "MAME信息屏（Press any key）",
+        "action": "按 enter",
+        "next": "odds"
+      },
+      {
+        "phase": "odds",
+        "desc": "ODDS赔率屏，PUSH START",
+        "action": "按 5 投币（如需）→ 按 1 开始",
+        "next": "exchange"
+      },
+      {
+        "phase": "exchange",
+        "desc": "換牌階段：請選擇您要交換的牌",
+        "action": "按 a-n 选牌 → 按 enter 确认",
+        "next": "play",
+        "rule": "可换0-13张任意数量，全换/不换都行",
+        "strategy": "看牌换：好牌不换，烂牌多换，听牌留听"
+      },
+      {
+        "phase": "play",
+        "desc": "打牌阶段",
+        "action": "识别手牌 → Gemma/本地策略决策 → 按 a-n 出牌",
+        "next": "play | meld_choice | result"
+      },
+      {
+        "phase": "meld_choice",
+        "desc": "吃碰杠选择",
+        "action": "按对应键选择（待验证具体键）",
+        "next": "play"
+      },
+      {
+        "phase": "result",
+        "desc": "结算屏",
+        "action": "按 1 继续下一局",
+        "next": "odds"
+      }
+    ]
+  },
+  "ai_config": {
+    "vision": {
+      "method": "模板匹配（cv2.matchTemplate）",
+      "threshold": 0.75,
+      "template_dir": "~/workspace/sdmg2-test/templates",
+      "template_count": "18/34（待补16张）"
+    },
+    "reasoning": {
+      "model": "gemma3:4b",
+      "api": "http://localhost:11434/api/generate",
+      "timeout": 120,
+      "avg_time": "48秒",
+      "fast_model": "gemma3:1b（8秒，简单决策用）"
+    },
+    "local_db": {
+      "winning_db": "胡牌判定，毫秒级，不用问AI",
+      "fan_db": "番数计算，毫秒级，不用问AI",
+      "tile_codec": "牌编码 1wan/1tiao/1bing/dong/bai"
+    },
+    "screenshot": {
+      "method": "xwd → xwdtopnm → ffmpeg转PNG",
+      "env": "DISPLAY=:0 XAUTHORITY=/home/zhangdawei/.Xauthority",
+      "note": "pnmtopng坏了，用ffmpeg"
+    }
+  },
+  "screen_coords": {
+    "note": "相对坐标，适配不同分辨率",
+    "hand_area": {
+      "x": 0.1,
+      "y": 0.82,
+      "w": 0.8,
+      "h": 0.15,
+      "desc": "手牌区"
+    },
+    "opp_hand": {
+      "x": 0.15,
+      "y": 0.05,
+      "w": 0.7,
+      "h": 0.12,
+      "desc": "对手手牌（牌背）"
+    },
+    "discards": {
+      "x": 0.3,
+      "y": 0.35,
+      "w": 0.5,
+      "h": 0.2,
+      "desc": "弃牌区"
+    },
+    "credit_bet": {
+      "x": 0.3,
+      "y": 0.5,
+      "w": 0.25,
+      "h": 0.12,
+      "desc": "CREDIT/BET显示"
+    },
+    "prompt": {
+      "x": 0.15,
+      "y": "0.60",
+      "w": 0.7,
+      "h": 0.1,
+      "desc": "提示文字区"
+    }
+  },
+  "discard_tile": {
+    "name": "打牌",
+    "steps": [
+      "按a-n选中",
+      "按enter确认打出"
+    ],
+    "verified": true,
+    "verified_at": "2026-10-17 15:22",
+    "evidence": "实战：N+enter打出發，差异41.1"
+  }
+}

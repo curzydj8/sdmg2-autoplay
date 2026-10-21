@@ -1,0 +1,80 @@
+{
+  "digit_1": {
+    "digit": "1",
+    "source": "/tmp/coin_seq_00_after.png",
+    "expected_value": "125",
+    "shape": [
+      46,
+      15
+    ]
+  },
+  "digit_2": {
+    "digit": "2",
+    "source": "/tmp/coin_seq_00_after.png",
+    "expected_value": "125",
+    "shape": [
+      46,
+      24
+    ]
+  },
+  "digit_5": {
+    "digit": "5",
+    "source": "/tmp/coin_seq_00_after.png",
+    "expected_value": "125",
+    "shape": [
+      46,
+      20
+    ]
+  },
+  "digit_6": {
+    "digit": "6",
+    "source": "/tmp/coin_seq_01_after.png",
+    "expected_value": "126",
+    "shape": [
+      46,
+      19
+    ]
+  },
+  "digit_7": {
+    "digit": "7",
+    "source": "/tmp/coin_seq_02_after.png",
+    "expected_value": "127",
+    "shape": [
+      46,
+      20
+    ]
+  },
+  "digit_8": {
+    "digit": "8",
+    "source": "/tmp/coin_seq_03_after.png",
+    "expected_value": "128",
+    "shape": [
+      46,
+      19
+    ]
+  },
+  "digit_9": {
+    "digit": "9",
+    "source": "/tmp/coin_seq_04_after.png",
+    "expected_value": "129",
+    "shape": [
+      46,
+      19
+    ]
+  },
+  "digit_3": {
+    "digit": "3",
+    "source": "/tmp/to130_after.png",
+    "expected_value": "130"
+  },
+  "digit_0": {
+    "digit": "0",
+    "source": "/tmp/to130_after.png",
+    "expected_value": "130"
+  },
+  "digit_4": {
+    "digit": "4",
+    "source": "/tmp/try4_9.png",
+    "expected_value": "145"
+  }
+}

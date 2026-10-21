@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+"""
+智能打牌程序 main.py（AI客户端）
+
+对应用户流程图：Ubuntu终端启动 → 2. 运行智能打牌程序
+- 初始化游戏环境
+- 投币/扣除押注积分（1~10分）
+- 系统发牌 → 对局循环 → 胡牌判定 → 大满贯检查 → 比倍 → 下一局
+"""
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "modules"))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from game_agent import GameAgent
+from config import load as load_config
+
+
+def main():
+    import argparse
+    p = argparse.ArgumentParser(description="超级大满贯II 智能打牌程序")
+    p.add_argument("--session", type=int, help="对局ID（不指定则新建）")
+    p.add_argument("--max-rounds", type=int, default=500)
+    a = p.parse_args()
+
+    cfg = load_config()
+    print(f"配置加载: 押分{cfg['min_bet']}~{cfg['max_bet']}, "
+          f"目标{cfg['target_score']}, 比倍{'开' if cfg['doubleup_enabled'] else '关'}")
+
+    # 新建对局
+    if not a.session:
+        import sqlite3
+        conn = sqlite3.connect(
+            "/home/zhangdawei/workspace/sdmg2-test/data/sdmg2.db", timeout=10)
+        cur = conn.execute("""
+            INSERT INTO game_sessions
+            (game_version, rom_id, started_at, config_version, result,
+             target_score, target_verified)
+            VALUES ('0.285','sdmg2',datetime('now'),'v1','running',?,1)
+        """, (cfg['target_score'],))
+        a.session = cur.lastrowid
+        conn.commit()
+        conn.close()
+        print(f"新建对局: session={a.session}")
+
+    agent = GameAgent(a.session)
+    agent.run(a.max_rounds)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,257 @@
+#!/usr/bin/env python3
+"""
+本地实时AI控制器 v1.1 - 最小可玩版本
+
+逻辑：
+- 截图 → 检测手牌区是否有牌
+- 有牌 → N+enter 打末张
+- 无牌 → 按1尝试开始
+- 记录到SQLite
+"""
+import os
+import sys
+import time
+import sqlite3
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+DB_PATH = "/home/zhangdawei/workspace/sdmg2-test/data/sdmg2.db"
+
+
+class LocalAIController:
+    def __init__(self, session_id, target_score=500):
+        self.session_id = session_id
+        self.target = target_score
+        self.running = False
+        self.lock_path = "/tmp/sdmg2_ai.lock"
+        # 检查锁：文件存在且PID存活才算运行中
+        if os.path.exists(self.lock_path):
+            try:
+                with open(self.lock_path) as f:
+                    old_pid = int(f.read().strip())
+                # 检查进程是否存活
+                os.kill(old_pid, 0)
+                raise RuntimeError(f"本地AI已在运行 (PID {old_pid})")
+            except (ValueError, ProcessLookupError, FileNotFoundError):
+                # 锁文件残留，清除
+                try:
+                    os.remove(self.lock_path)
+                except:
+                    pass
+        open(self.lock_path, "w").write(str(os.getpid()))
+
+        # 加载策略配置
+        self.strategy = self.load_strategy()
+        # 加载目标配置
+        self.target_config = self.load_target()
+
+        from evdev import UInput, ecodes as E
+        keys = [E.KEY_1, E.KEY_5, E.KEY_ENTER, E.KEY_ESC, E.KEY_N]
+        for ch in "abcdefghijklm":
+            keys.append(getattr(E, f"KEY_{ch.upper()}"))
+        self.ui = UInput({E.EV_KEY: keys}, name="sdmg2-local-ai")
+        self.E = E
+        self.log(f"启动 session={session_id} 策略={self.strategy.get('version')} 目标={self.target}")
+
+    def load_strategy(self):
+        """从DB加载策略配置"""
+        try:
+            conn = sqlite3.connect(DB_PATH, timeout=5)
+            row = conn.execute(
+                "SELECT version, bet_strong, bet_normal, bet_weak, doubleup_risk FROM strategy_configs WHERE is_active=1"
+            ).fetchone()
+            conn.close()
+            if row:
+                return {"version": row[0], "bet_strong": row[1],
+                        "bet_normal": row[2], "bet_weak": row[3],
+                        "doubleup_risk": row[4]}
+        except:
+            pass
+        return {"version": "v1", "bet_strong": 10, "bet_normal": 5,
+                "bet_weak": 1, "doubleup_risk": "aggressive"}
+
+    def load_target(self):
+        """从统一配置加载目标"""
+        try:
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            from target_config import load_config
+            return load_config()
+        except:
+            return {"target": 500}
+
+    def log(self, msg):
+        import datetime
+        line = f"[{datetime.datetime.now().strftime('%H:%M:%S')}] {msg}"
+        print(line, flush=True)
+        # 同时写文件
+        try:
+            with open("/tmp/sdmg2_ai.log", "a") as f:
+                f.write(line + "\n")
+        except:
+            pass
+
+    def screenshot(self):
+        import cv2
+        os.system("xwd -root -silent 2>/dev/null > /tmp/ai_cap.xwd")
+        os.system("xwdtopnm /tmp/ai_cap.xwd 2>/dev/null > /tmp/ai_cap.ppm")
+        os.system("ffmpeg -y -v error -i /tmp/ai_cap.ppm /tmp/ai_cap.png 2>/dev/null")
+        return cv2.imread("/tmp/ai_cap.png")
+
+    def is_odds_screen(self, img):
+        """检测是否ODDS屏（紫色背景+ODDS大字）"""
+        import cv2
+        import numpy as np
+        h, w = img.shape[:2]
+        # 顶部区域：ODDS屏有大字，游戏中有牌桌
+        top = img[int(h*0.05):int(h*0.25), int(w*0.2):int(w*0.8)]
+        # ODDS屏顶部非常亮且多彩
+        hsv = cv2.cvtColor(top, cv2.COLOR_BGR2HSV)
+        # 紫色背景检测（ODDS屏特征，需高比例）
+        purple = np.mean((hsv[:,:,0] > 120) & (hsv[:,:,0] < 160))
+        return purple > 0.6  # 提高阈值，避免误判
+
+    def has_hand(self, img):
+        """检测手牌区是否有牌"""
+        import cv2
+        import numpy as np
+        # 先排除ODDS屏
+        if self.is_odds_screen(img):
+            return False
+        h, w = img.shape[:2]
+        # 手牌区：底部
+        roi = img[int(h*0.87):int(h*0.97), int(w*0.1):int(w*0.9)]
+        gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+        # 牌是亮色，背景是深色
+        bright = np.mean(gray > 100)
+        return bright > 0.3  # 超过30%亮像素认为有牌
+
+    def press(self, key_name):
+        km = {"1": self.E.KEY_1, "5": self.E.KEY_5,
+              "enter": self.E.KEY_ENTER, "esc": self.E.KEY_ESC,
+              "n": self.E.KEY_N}
+        # 牌槽位键 a-m：UInput 已注册 KEY_A..KEY_M，这里补映射
+        # （之前缺失导致智能打牌选中槽位时静默无按键）
+        if len(key_name) == 1 and "a" <= key_name <= "m":
+            code = getattr(self.E, f"KEY_{key_name.upper()}", None)
+        else:
+            code = km.get(key_name)
+        if not code:
+            self.log(f"未知按键: {key_name}")
+            return False
+        self.ui.write(self.E.EV_KEY, code, 1)
+        self.ui.syn()
+        time.sleep(0.05)
+        self.ui.write(self.E.EV_KEY, code, 0)
+        self.ui.syn()
+        time.sleep(0.08)
+        return True
+
+    def discard_last(self):
+        """N+enter 打末张（<1秒）"""
+        t0 = time.time()
+        self.press("n")
+        time.sleep(0.15)
+        self.press("enter")
+        dt = (time.time() - t0) * 1000
+        self.log(f"打牌 N+enter {dt:.0f}ms")
+        return dt < 1000, dt
+
+    def discard_smart(self, img):
+        """智能打牌：识别手牌，打最没用的。返回 (成功, 耗时ms)"""
+        try:
+            from mahjong_vision import MahjongVision
+            from high_fan_strategy import choose_discard
+            from tile_codec import encode_tile, CODE_TO_CN
+            vision = MahjongVision()
+            result = vision.recognize_hand(img, min_confidence=0.6)
+            if not result or len(result) < 13:
+                self.log("识别失败，打末张")
+                return self.discard_last()
+            # 视觉模板名 -> 策略编码（wan1->1wan, tong2->2bing, honor_east->dong）
+            codes = [encode_tile(r[0]) for r in result]  # (name, confidence)
+            known_idx = [i for i, c in enumerate(codes) if c != "unknown"]
+            if len(known_idx) < 13:
+                self.log(f"已知牌仅{len(known_idx)}张，打末张")
+                return self.discard_last()
+            known_codes = [codes[i] for i in known_idx]
+            # choose_discard 返回四元组 (idx, tile, score, detail)，不是单个下标
+            idx, tile, score, _ = choose_discard(known_codes, strategy="balanced")
+            orig = known_idx[idx]
+            slot = "abcdefghijklmn"[orig]
+            cn = CODE_TO_CN.get(tile, tile)
+            self.log(f"智能选牌: 打槽位{slot} ({tile}/{cn}) 得分{score}")
+            # 选中+确认（<1秒）
+            t0 = time.time()
+            self.press(slot)
+            time.sleep(0.15)
+            self.press("enter")
+            dt = (time.time() - t0) * 1000
+            self.log(f"打牌 {slot}+enter {dt:.0f}ms")
+            return dt < 1000, dt
+        except Exception as e:
+            self.log(f"智能打牌失败: {e}，打末张")
+            return self.discard_last()
+
+    def record_action(self, action, duration_ms, success):
+        """写入 actions 表。注意表结构列是 (chosen, result, duration_ms, ...)，没有 action_type 列"""
+        try:
+            conn = sqlite3.connect(DB_PATH, timeout=5)
+            conn.execute("""
+                INSERT INTO actions (session_id, chosen, result, duration_ms, strategy_version, created_at)
+                VALUES (?, ?, ?, ?, ?, datetime('now'))
+            """, (self.session_id, action, "ok" if success else "fail",
+                  int(duration_ms), self.strategy.get("version", "v1")))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            self.log(f"记录失败: {e}")
+
+    def run(self, max_rounds=200):
+        self.running = True
+        self.log("开始自动游戏")
+        try:
+            for r in range(max_rounds):
+                if not self.running:
+                    break
+                img = self.screenshot()
+                if img is None:
+                    self.log("截图失败，等待")
+                    time.sleep(5)
+                    continue
+                if self.has_hand(img):
+                    self.log(f"轮{r}: 检测到手牌，智能打牌")
+                    ok, ms = self.discard_smart(img)
+                    self.record_action("smart_discard", ms, ok)
+                else:
+                    self.log(f"轮{r}: 无手牌，上分+开始")
+                    t0 = time.time()
+                    # 先上分（按5键10次）
+                    for _ in range(10):
+                        self.press("5")
+                    time.sleep(1)
+                    # 再按1开始
+                    self.press("1")
+                    ms = (time.time() - t0) * 1000
+                    self.record_action("credit+start", ms, True)
+                time.sleep(4)  # 等待游戏响应
+        finally:
+            self.cleanup()
+
+    def cleanup(self):
+        try:
+            self.ui.close()
+        except:
+            pass
+        if os.path.exists(self.lock_path):
+            os.remove(self.lock_path)
+        self.log("已退出")
+
+
+if __name__ == "__main__":
+    import argparse
+    p = argparse.ArgumentParser()
+    p.add_argument("--session", type=int, required=True)
+    p.add_argument("--target", type=int, default=500)
+    p.add_argument("--max-rounds", type=int, default=200)
+    a = p.parse_args()
+    LocalAIController(a.session, a.target).run(a.max_rounds)

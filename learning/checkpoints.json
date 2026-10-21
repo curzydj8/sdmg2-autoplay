@@ -1,0 +1,24 @@
+{
+  "tasks_completed": [],
+  "tasks_pending": [
+    "Q-001",
+    "Q-002",
+    "Q-003"
+  ],
+  "rules_verified": [
+    "R-001",
+    "R-002"
+  ],
+  "last_state": {
+    "mame_pid": "39433",
+    "time": "2026-10-14T22:06:24.496927"
+  },
+  "mame_restarts": 33,
+  "action_failures": 0,
+  "last_exit": {
+    "pid": "unknown",
+    "reason": "not_running",
+    "time": "2026-10-14T21:52:03.072748"
+  },
+  "last_saved": "2026-10-14T22:06:24.500900"
+}

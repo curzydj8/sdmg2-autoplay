@@ -1,0 +1,59 @@
+{
+  "trigger": {
+    "desc": "和牌后触发",
+    "condition": "3分以上（3番+），中滿貫，可玩大滿貫",
+    "source": "ODDS屏：'3分以上，中滿貫，可玩大滿貫'"
+  },
+  "jackpot": {
+    "value": 500,
+    "desc": "比倍奖池上限",
+    "source": "DIP: Double Up Jackpot=500"
+  },
+  "game_name": {
+    "value": "Continue Play",
+    "desc": "比倍游戏名",
+    "source": "DIP: Double Up Game Name"
+  },
+  "flow": [
+    {
+      "step": 1,
+      "desc": "和牌结算后，提示是否比倍",
+      "action": "选择 YES（比倍）或 NO（收分）",
+      "key": "待验证"
+    },
+    {
+      "step": 2,
+      "desc": "比倍画面：选一张牌",
+      "action": "按 a-n 或方向键选牌",
+      "key": "待验证"
+    },
+    {
+      "step": 3,
+      "desc": "与庄家比大小",
+      "rule": "大赢、平为和、小输",
+      "detail": "待实机验证具体比法（牌点/花色）"
+    },
+    {
+      "step": 4,
+      "desc": "赢了可继续比倍或收分",
+      "action": "选择继续或收分",
+      "limit": "到500奖池上限强制收分"
+    }
+  ],
+  "strategy": {
+    "desc": "比倍策略：爆机流",
+    "goal": "爆机（500奖池），不比倍永远爆不了",
+    "rules": [
+      "一律比倍，直到奖池到500爆机",
+      "只有奖池满500才收分",
+      "输了就输了，下一局再来"
+    ],
+    "note": "2026-10-17 用户定：要玩爆机，保守策略永爆不了"
+  },
+  "odds_bet": {
+    "desc": "大滿貫BET",
+    "value": 4,
+    "source": "ODDS屏显示：大滿貫BET 4",
+    "note": "与比倍相关的押注，待验证"
+  }
+}

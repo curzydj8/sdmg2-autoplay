@@ -1,0 +1,90 @@
+{
+  "detect_freq": {
+    "screen_check": {
+      "interval": 2,
+      "desc": "每2秒截屏识别一次画面"
+    },
+    "credit_check": {
+      "interval": 5,
+      "desc": "每5秒检查CREDIT",
+      "trigger": "ODDS屏或结算屏时"
+    },
+    "phase_check": {
+      "interval": 1,
+      "desc": "对局中每1秒检查阶段变化"
+    }
+  },
+  "credit_timing": {
+    "when": [
+      "ODDS屏且 CREDIT < 10",
+      "结算屏且 CREDIT < 10",
+      "BET > CREDIT（押注不够）"
+    ],
+    "how_much": {
+      "per_press": 1,
+      "presses": 20,
+      "total": 20,
+      "desc": "按20次5键，上20分"
+    },
+    "interval_between_press": 0.4,
+    "desc": "上分到20+再开局",
+    "max": 2000
+  },
+  "draw_timing": {
+    "detect": "游戏自动摸牌，无需AI操作",
+    "active_draw": "玩家主动摸牌时 <1秒",
+    "wait_after": 0.5,
+    "desc": "游戏自动摸牌；主动摸牌<1秒，AI等0.5秒再识别"
+  },
+  "play_timing": {
+    "steps": [
+      {
+        "op": "截图",
+        "time": 0.5
+      },
+      {
+        "op": "模板匹配认牌",
+        "time": 0.3
+      },
+      {
+        "op": "本地策略决策",
+        "time": 0.1
+      },
+      {
+        "op": "Gemma决策（复杂时）",
+        "time": 48
+      },
+      {
+        "op": "uinput按键",
+        "time": 0.5
+      },
+      {
+        "op": "等待画面更新",
+        "time": 2
+      }
+    ],
+    "total_fast": 3.4,
+    "total_with_gemma": 51,
+    "desc": "简单局面3.4秒，复杂局面51秒"
+  },
+  "exchange_timing": {
+    "detect": "画面'請選擇您要交換的牌'",
+    "decision_time": 2,
+    "action": "按a-n选牌，每张间隔0.4秒",
+    "confirm": "按enter确认，等待2秒",
+    "total": 5
+  },
+  "doubleup_timing": {
+    "detect": "和牌结算后出现比倍提示",
+    "decision": "查doubleup_db.should_double_up()",
+    "action": "选YES/NO，选牌比大小",
+    "per_round": 3,
+    "desc": "每轮比倍约3秒，直到爆机或输"
+  },
+  "main_loop": {
+    "interval": 2,
+    "desc": "主循环每2秒一轮：截图→识别→决策→执行",
+    "timeout_per_step": 60,
+    "max_steps_per_game": 100
+  }
+}

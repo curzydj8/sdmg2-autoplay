@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=超级大满贯II 本地AI
+Comment=启动本地AI自主打牌
+Exec=env DISPLAY=:0 python3 /home/zhangdawei/sdmg2-test/tools/ai_launcher.py
+Icon=applications-games
+Terminal=false
+Type=Application
+Categories=Game;
+Path=/home/zhangdawei/sdmg2-test
